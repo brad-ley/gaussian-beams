@@ -68,7 +68,7 @@ class Mirror(Lens):
 
 
 class Aperture(Lens):
-    def __init__(self, pos: float, r: float = 25.4):
+    def __init__(self, f: float = np.inf, pos: float = -1, r: float = 25.4):
         """__init__.
 
         :param pos: distance from last optical element
@@ -327,18 +327,18 @@ def main() -> None:
     elements = [
         Mirror(f=250, pos=250, r=50),
         Mirror(f=250, pos=500, r=50),
-        Aperture(pos=250 + 0 + 89 - 89 / np.sqrt(2), r=12.7),
+        Aperture(pos=250 + 0 + 89 - 89 / np.sqrt(2), r=12.7 / np.sqrt(2)),
         Mirror(f=89, pos=89 / np.sqrt(2)),
-        Mirror(f=np.inf, pos=89),
-        Mirror(f=89, pos=89),
-        Aperture(pos=89 / np.sqrt(2), r=12.7),
+        Mirror(f=np.inf, pos=89 - 0),
+        Mirror(f=89, pos=89 - 0),
+        Aperture(pos=89 / np.sqrt(2), r=12.7 / np.sqrt(2)),
         Mirror(f=np.inf, pos=89 - 89 / np.sqrt(2), r=30),
     ]
     print(*elements, sep="\n")
 
-    B = Beam(lam=1.25, w=5.7)
-    B.simulate(elements=elements, fiber_integral_radius=5).plot(
-        encircled_energy=95,
+    B = Beam(lam=0.9, w=0.64 * 9)  # 0.64 * horn radius
+    B.simulate(elements=elements, fiber_integral_radius=0.64 * 5).plot(
+        encircled_energy=99,
         savepath="/Users/Brad/Desktop/",
     )
 

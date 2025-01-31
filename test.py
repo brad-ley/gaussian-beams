@@ -1,253 +1,66 @@
-import dash_bootstrap_components as dbc
-import numpy as np
-import plotly.express as px
-import plotly.io as pio
-from dash import Dash, Input, Output, Patch, State, callback, dcc, html
-from dash_bootstrap_templates import load_figure_template
-
-# adds templates to plotly.io
-load_figure_template(["DARKLY", "MINTY_DARK"])
+import dash
+from dash import MATCH, Patch, html
+from dash_extensions import EventListener
+from dash.dependencies import Input, Output, State, ClientsideFunction
 
 
-df = px.data.gapminder()
-
-app = Dash(__name__, external_stylesheets=[dbc.themes.SLATE])
-
-fig = px.scatter(
-    df.query("year==2007"),
-    x="gdpPercap",
-    y="lifeExp",
-    size="pop",
-    color="continent",
-    log_x=True,
-    size_max=60,
-    template="MINTY_DARK",
-    # template="DARKLY",
+app = dash.Dash(
+    __name__,
+    external_scripts=["https://cdnjs.cloudflare.com/ajax/libs/dragula/3.7.2/dragula.min.js"],
+    prevent_initial_callbacks=True,
 )
 
-SIDEBAR_STYLE = {
-    "position": "fixed",
-    "top": 0,
-    "left": 50,
-    "bottom": 0,
-    "width": "24rem",
-    "padding": "2rem 1rem",
-    # "background-color": "#f8f9fa",
-}
+app.layout = html.Div(
+    id="main",
+    children=[
+        EventListener(
+            html.Div(id={"type": "drag_container", "idx": 0}, className="container", children=[]),
+            events=[
+                {
+                    "event": "dropcomplete",
+                    "props": ["detail.name", "detail.children"],
+                }
+            ],
+            logging=True,
+            id={"type": "el_drag_container", "idx": 0},
+        ),
+        html.Button(id={"type": "add_btn", "idx": 0}, children="Add"),
+        html.Div(id={"type": "test_div", "idx": 0}),
+    ],
+)
 
-PLOT_STYLE = {
-    # "position": "fixed",
-    # "top": 0,
-    # "left": 75,
-    # "bottom": 0,
-    # "width": "75rem",
-    "padding": "2rem 1rem",
-    # "margin-left": "15px",
-    # "margin-top": "7px",
-    # "margin-right": "15px",
-}
-
-
-elements = {"M": "Mirror", "L": "Lens", "A": "Aperture"}
-
-
-def parse_element(element: str) -> html.Div:
-    match element:
-        case "M" | "L":
-            return html.Div([
-                # dbc.Row([f"{elements[element]}"]),
-                dbc.Row(
-                    [
-                        dbc.Col(
-                            "z:",
-                            style={
-                                "display": "inline-block",
-                            },
-                        ),
-                        dbc.Input(
-                            type="number",
-                            placeholder="mm",
-                            min=0,
-                            id="pos",
-                            style={
-                                "width": "5rem",
-                                "display": "inline-block",
-                            },
-                        ),
-                        dbc.Col(
-                            "f:",
-                            style={
-                                "display": "inline-block",
-                            },
-                        ),
-                        dbc.Input(
-                            type="number",
-                            placeholder="mm",
-                            min=0,
-                            id="focal_length",
-                            style={
-                                "width": "5rem",
-                                "display": "inline-block",
-                            },
-                        ),
-                        dbc.Col(
-                            "r:",
-                            style={
-                                "display": "inline-block",
-                            },
-                        ),
-                        dbc.Input(
-                            type="number",
-                            placeholder="mm",
-                            min=0,
-                            id="aperture_radius",
-                            style={
-                                "width": "5rem",
-                                "display": "inline-block",
-                            },
-                        ),
-                    ],
-                ),
-            ])
-        case "A":
-            return html.Div([
-                # dbc.Row([f"{elements[element]}"]),
-                dbc.Row(
-                    [
-                        dbc.Col(
-                            "z:",
-                            style={
-                                "display": "inline-block",
-                            },
-                        ),
-                        dbc.Input(
-                            type="number",
-                            placeholder="mm",
-                            min=0,
-                            id="pos",
-                            style={
-                                "width": "5rem",
-                                "display": "inline-block",
-                            },
-                        ),
-                        dbc.Col(
-                            "f:",
-                            style={
-                                "display": "inline-block",
-                            },
-                        ),
-                        dbc.Input(
-                            type="number",
-                            placeholder="np.inf",
-                            min=0,
-                            value=np.inf,
-                            id="focal_length",
-                            disabled=True,
-                            style={
-                                "width": "5rem",
-                                "display": "inline-block",
-                            },
-                        ),
-                        dbc.Col(
-                            "r:",
-                            style={
-                                "display": "inline-block",
-                            },
-                        ),
-                        dbc.Input(
-                            type="number",
-                            placeholder="mm",
-                            min=0,
-                            id="aperture_radius",
-                            style={
-                                "width": "5rem",
-                                "display": "inline-block",
-                            },
-                        ),
-                    ],
-                ),
-            ])
+app.clientside_callback(
+    ClientsideFunction(namespace="clientside", function_name="make_draggable"),
+    Output({"type": "drag_container", "idx": MATCH}, "data-drag"),
+    [
+        Input({"type": "drag_container", "idx": MATCH}, "id"),
+        Input({"type": "add_btn", "idx": MATCH}, "n_clicks"),
+    ],
+)
 
 
 @app.callback(
-    Output("elements-container", "children"),
-    Output("element-select", "value"),
-    Input("element-select", "value"),
-    State("elements-container", "children"),
-    prevent_initial_call=True,
+    Output({"type": "drag_container", "idx": MATCH}, "children"),
+    Input({"type": "add_btn", "idx": MATCH}, "n_clicks"),
 )
-def make_element(elem: str, children: html.Div) -> html.Div:
-    print(children)
-    new_element = html.Div(
-        [
-            dbc.Row(
-                [
-                    dbc.Col(
-                        dbc.Button(
-                            "X",
-                            title="Close",
-                            id="close",
-                            className="me-1",
-                            style={
-                                # "background-color": "lightgreen",
-                                # "height": "5px",
-                                "text-align": "center",
-                                "display": "inline-block",
-                            },
-                        ),
-                        width=4,
-                    ),
-                    dbc.Col(
-                        f"{elements[elem]} {len(children)}",
-                        width=8,
-                        className="h-50",
-                    ),
-                ],
-                style={"width": "12rem"},
-            ),
-            parse_element(elem),
-        ],
-        id=str(len(children)),
+def add_element(n_clicks):
+    patched_children = Patch()
+    patched_children.append(
+        html.Div(id={"type": "div", "idx": 0, "idx2": n_clicks}, children=f"Text {n_clicks}")
     )
-    children.append(new_element)
-    return children, None
+    return patched_children
 
 
-sidebar = html.Div(
-    [
-        html.H2("Optics"),
-        html.Hr(),
-        html.P("Add optical elements", className="lead"),
-        dbc.Nav(
-            [
-                dcc.Dropdown(
-                    options=[{"label": elements[key], "value": key} for key in elements],
-                    # value=1,
-                    placeholder="Choose element",
-                    style={"color": "black", "width": "12rem"},
-                    id="element-select",
-                ),
-                html.Br(),
-            ],
-            vertical=True,
-            # pills=True,
-        ),
-        html.Div(id="elements-container", children=[]),
-    ],
-    style=SIDEBAR_STYLE,
+@app.callback(
+    Output({"type": "test_div", "idx": MATCH}, "children"),
+    Input({"type": "el_drag_container", "idx": MATCH}, "n_events"),
+    State({"type": "el_drag_container", "idx": MATCH}, "event"),
 )
-
-app.layout = dbc.Container([
-    dbc.Row([
-        dbc.Col(sidebar, width=4),
-        dbc.Col(
-            dcc.Graph(id="graph", figure=fig, className="border"),
-            width=8,
-            style=PLOT_STYLE,
-        ),
-    ]),
-])
+def get_new_order(n_events, event):
+    """Get new order of elements - can be used to synchronize children"""
+    print(f"New order is: {event['detail.children']}")
+    return str(event["detail.children"])
 
 
 if __name__ == "__main__":
-    app.run_server(debug=True)
+    app.run_server(debug=True, port=1027)
