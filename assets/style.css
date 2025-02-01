@@ -1,3 +1,15 @@
+.upload-data .upload-data--uploader .upload-data--text {
+  background-color: rgb(34, 37, 42) !important;
+  width: 100%;
+  height: 60px;
+  line-height: 60px;
+  border-width: 1px;
+  border-style: dashed;
+  border-radius: 5px;
+  text-align: center;
+  margin: 10px;
+}
+
 .Select-control {
   background-color: rgb(34, 37, 42) !important;
   color: white;
@@ -11,3 +23,14 @@
 .Select-value-label {
   color: white !important;
 }
+
+/* .upload-data .upload-data--uploader .upload-data--text { */
+/*   width: 100%; */
+/*   height: 60px; */
+/*   line-height: 60px; */
+/*   border-width: 1px; */
+/*   border-style: dashed; */
+/*   border-radius: 5px; */
+/*   text-align: center; */
+/*   margin: 10px; */
+/* } */

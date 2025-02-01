@@ -210,11 +210,14 @@ class Beam:
         )
 
         self.loss = 10 * np.log10(self._power)
+
+        return self
+
+    def print(self) -> None:
         print(
             f"Converted power = {self._power:.2f} ({self.loss:.1f} dB loss)\n"
             f"Fiber coupling = {self.fiber_integral:.2f}",
         )
-        return self
 
     def encircled_ratio(self, encircled_energy: float) -> float:
         self.encirc_scale = np.sqrt(-1 / 2 * np.log((100 - encircled_energy) / 100))
@@ -356,7 +359,7 @@ def main() -> None:
     B.simulate(elements=elements, fiber_integral_radius=0.64 * 5).plot(
         encircled_energy=99,
         savepath="/Users/Brad/Desktop/",
-    )
+    ).print()
 
 
 if __name__ == "__main__":

@@ -67,7 +67,7 @@ PLOT_STYLE = {
 }
 
 OPTIC_STYLE = {
-    "margin-left": "7.25pt",
+    "margin-left": "0pt",
     "margin-top": "10px",
 }
 
@@ -97,10 +97,7 @@ def parse_element(element: str, t: float) -> html.Div:
                     dbc.Col(
                         dcc.Markdown(
                             "z:",
-                            style={
-                                "margin-left": "8pt",
-                                "margin-top": "10px",
-                            },
+                            style=OPTIC_STYLE,
                         ),
                         width="auto",
                     ),
@@ -113,6 +110,7 @@ def parse_element(element: str, t: float) -> html.Div:
                             id={"type": "pos", "index": t},
                             style={
                                 "width": "5.5rem",
+                                "margin-right": "10pt",
                             },
                         ),
                         width="auto",
@@ -120,10 +118,7 @@ def parse_element(element: str, t: float) -> html.Div:
                     dbc.Col(
                         dcc.Markdown(
                             "f:",
-                            style={
-                                "margin-left": "8pt",
-                                "margin-top": "10px",
-                            },
+                            style=OPTIC_STYLE,
                         ),
                         width="auto",
                     ),
@@ -137,6 +132,7 @@ def parse_element(element: str, t: float) -> html.Div:
                             id={"type": "focal_length", "index": t},
                             style={
                                 "width": "5.5rem",
+                                "margin-right": "10pt",
                             },
                         ),
                         width="auto",
@@ -160,6 +156,7 @@ def parse_element(element: str, t: float) -> html.Div:
                     ),
                 ],
                 className="g-0",
+                justify="around",
             ),
         ],
         style={"margin-bottom": "15px"},
@@ -216,7 +213,6 @@ def set_persist_state(
                     "children"
                 ]:
                     ee = e["props"]["children"]
-                    print(ee)
                     if "id" in ee["props"] and "value" in ee["props"]:
                         match ee["props"]["id"]["type"]:
                             case "pos":
@@ -236,7 +232,7 @@ def set_persist_state(
 
                 kwargs = {"f": f, "pos": z, "r": r}
                 optics.append(sim_elements[elem_type](**kwargs))
-                print(*optics, sep="\n")
+                # print(*optics, sep="\n")
                 match elem_type:
                     case "Lens":
                         fig.add_trace(
@@ -472,7 +468,6 @@ def handle_elements(
             ],
             id=f"elem-{t}",
         )
-        print(new_element)
         children.append(new_element)
         # return children, None
         # return None
@@ -773,14 +768,14 @@ app.layout = dbc.Container(
                                     children=html.Span(
                                         [
                                             html.I(
-                                                className="bi bi-file-earmark-arrow-down",
+                                                className="bi bi-file-earmark-arrow-up",
                                                 style={
                                                     "display": "inline-block",
                                                     "margin-right": "5px",
                                                 },
                                             ),
                                             html.Div(
-                                                "Upload configuration plot",
+                                                "Drag-and-drop or click to upload configuration plot",
                                                 style={
                                                     "paddingRight": "0.5vw",
                                                     "display": "inline-block",
@@ -789,11 +784,11 @@ app.layout = dbc.Container(
                                         ],
                                     ),
                                     # "Delete all",
-                                    title="Download figure",
+                                    # title="Download figure",
                                     id="upload-fig",
                                     # className="me-1",
-                                    color="secondary",
-                                    outline=True,
+                                    # color="secondary",
+                                    # outline=True,
                                     style={
                                         # "background-color": "lightgreen",
                                         # "height": "5px",
