@@ -98,7 +98,8 @@ class FreeSpace(Lens):
 
     def __repr__(self):
         return f"{type(self).__name__:<9} for {self.z:>4} mm".ljust(
-            LJ1, "."
+            LJ1,
+            ".",
         ) + f"n={self.n}".ljust(LJ2)
 
 
@@ -134,8 +135,13 @@ class Beam:
         Returns
             self
         """
-        if any(z_axis):
+
+        # print("z_axis")
+        # print(z_axis)
+
+        if len(z_axis) > 0:
             self.z_axis = np.array(z_axis)
+
         if not hasattr(self, "z_axis"):
             add = 0
             if elements[-1].f < np.inf:
@@ -146,9 +152,12 @@ class Beam:
                 1000,
             )
 
+        # print("self.z_axis")
+        # print(self.z_axis)
+
         self._q = np.zeros(self.z_axis.shape).astype("complex128")
         self._q[0] = self.q(self.R, self.lam, self.w)
-        self._amp = 1
+        self._amp, self._power = 1, 1
 
         if elements is None:
             self.optics = []
@@ -169,7 +178,7 @@ class Beam:
         h = False
         for i, z in enumerate(self.z_axis):
             if i > 0:  # make sure we aren't at first index
-                if optic_positions and z > optic_positions[0]:
+                if optic_positions and z >= optic_positions[0]:
                     mat = self.optics[optic_count].abcd
                     aperture = self.optics[optic_count].r
                     optic = optic_positions.pop(0)
@@ -185,6 +194,7 @@ class Beam:
                 )
                 omeg = np.sqrt(-self.lam / np.pi / np.imag(1 / self._q[i]))
                 self._amp *= 1 - np.exp(-((aperture / omeg) ** 2))
+                self._power *= 1 - np.exp(-2 * ((aperture / omeg) ** 2))
 
                 if omeg > aperture:
                     self._q[i] = 1 / (
@@ -198,10 +208,16 @@ class Beam:
         self.fiber_integral = np.exp(
             -((self.w[-1] - fiber_integral_radius) ** 2) / (fiber_integral_radius) ** 2,
         )
+
+        self.loss = 10 * np.log10(self._power)
         print(
-            f"Converted power = {self._amp:.2f} ({10 * np.log10(self._amp):.1f} dB loss)\n"
+            f"Converted power = {self._power:.2f} ({self.loss:.1f} dB loss)\n"
             f"Fiber coupling = {self.fiber_integral:.2f}",
         )
+        return self
+
+    def encircled_ratio(self, encircled_energy: float) -> float:
+        self.encirc_scale = np.sqrt(-1 / 2 * np.log((100 - encircled_energy) / 100))
         return self
 
     def plot(
@@ -286,12 +302,12 @@ class Beam:
                     horizontalalignment="center",
                 )
 
-        scale = np.sqrt(-1 / 2 * np.log((100 - encircled_energy) / 100))
+        self.encircled_ratio(encircled_energy)
 
-        a.plot(z_axis, w * scale, c="k")
+        a.plot(z_axis, w * self.encirc_scale, c="k")
         if full == "enabled":
             bottom = -self.w
-            a.plot(z_axis, -w * scale, c="k")
+            a.plot(z_axis, -w * self.encirc_scale, c="k")
         else:
             bottom = 0
         a.fill_between(
