@@ -1,29 +1,28 @@
 from __future__ import annotations
 
-from pathlib import Path as P
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import rc
 
-if __name__ == "__main__":
-    plt.style.use(["science"])
-    rc("text.latex", preamble=r"\usepackage{cmbright}")
-    rcParams = [
-        ["font.family", "sans-serif"],
-        ["font.size", 14],
-        ["axes.linewidth", 1],
-        ["lines.linewidth", 2],
-        ["xtick.major.size", 5],
-        ["xtick.major.width", 1],
-        ["xtick.minor.size", 2],
-        ["xtick.minor.width", 1],
-        ["ytick.major.size", 5],
-        ["ytick.major.width", 1],
-        ["ytick.minor.size", 2],
-        ["ytick.minor.width", 1],
-    ]
-    plt.rcParams.update(dict(rcParams))
+plt.style.use(["science"])
+rc("text.latex", preamble=r"\usepackage{cmbright}")
+rcParams = [
+    ["font.family", "sans-serif"],
+    ["font.size", 14],
+    ["axes.linewidth", 1],
+    ["lines.linewidth", 2],
+    ["xtick.major.size", 5],
+    ["xtick.major.width", 1],
+    ["xtick.minor.size", 2],
+    ["xtick.minor.width", 1],
+    ["ytick.major.size", 5],
+    ["ytick.major.width", 1],
+    ["ytick.minor.size", 2],
+    ["ytick.minor.width", 1],
+]
+plt.rcParams.update(dict(rcParams))
 
 LJ1 = 25
 LJ2 = 15
@@ -228,6 +227,8 @@ class Beam:
         encircled_energy: float = 100 * (1 - np.exp(-2)),
         full: str = "enabled",
         savepath: str = "",
+        fig: plt = None,
+        ax: plt.ax = None,
     ) -> None:
         """
         plot.
@@ -244,11 +245,12 @@ class Beam:
             ]
             ax.legend(*zip(*unique), frameon=True)
 
-        f, a = plt.subplots(
-            figsize=(7, 5),
-            num=rf"Beam waist and {encircled_energy:.1f}%"
-            f" encircled ({10 * np.log10(self._amp):.1f} dB loss)",
-        )
+        if fig is None or ax is None:
+            fig, ax = plt.subplots(
+                figsize=(7, 5),
+                num=rf"Beam waist and {encircled_energy:.1f}%"
+                f" encircled ({10 * np.log10(self._amp):.1f} dB loss)",
+            )
         w = self.w[:]
         z_axis = self.z_axis[:]
         for position in self.optic_positions[::-1]:  # reversed to not move indices after inserting
@@ -261,7 +263,7 @@ class Beam:
                 type(self.elements[i]) is Aperture
                 and self.optic_positions[i] <= np.floor(self.z_axis.max() * 10) / 10
             ):
-                a.vlines(
+                ax.vlines(
                     position,
                     ymin=self.elements[i].r,
                     ymax=max(self.w.max(), self.elements[i].r + 5),
@@ -269,7 +271,7 @@ class Beam:
                     label=type(self.elements[i]).__name__,
                 )
                 if full == "enabled":
-                    a.vlines(
+                    ax.vlines(
                         position,
                         ymin=min(-self.w.max(), -self.elements[i].r - 5),
                         ymax=-self.elements[i].r,
@@ -279,7 +281,7 @@ class Beam:
             elif type(self.elements[i]) in {Lens, Mirror}:
                 ls = ":" if type(self.elements[i]) is Lens else "--"
                 if full == "enabled":
-                    a.plot(
+                    ax.plot(
                         [position, position],
                         [self.optics[i].r, -self.optics[i].r],
                         c="k",
@@ -288,7 +290,7 @@ class Beam:
                         label=type(self.elements[i]).__name__,
                     )
                 else:
-                    a.plot(
+                    ax.plot(
                         [position, position],
                         [self.optics[i].r, 0],
                         c="k",
@@ -298,7 +300,7 @@ class Beam:
                     )
 
                 label = r"$\infty$" if self.optics[i].f == np.inf else f"{self.optics[i].f:d}"
-                a.annotate(
+                ax.annotate(
                     # rf"${self.optics[i].f:d}\,$mm",
                     label,
                     (position, self.optics[i].r * 1.05),
@@ -307,13 +309,13 @@ class Beam:
 
         self.encircled_ratio(encircled_energy)
 
-        a.plot(z_axis, w * self.encirc_scale, c="k")
+        ax.plot(z_axis, w * self.encirc_scale, c="k")
         if full == "enabled":
             bottom = -self.w
-            a.plot(z_axis, -w * self.encirc_scale, c="k")
+            ax.plot(z_axis, -w * self.encirc_scale, c="k")
         else:
             bottom = 0
-        a.fill_between(
+        ax.fill_between(
             self.z_axis,
             y1=bottom,
             y2=self.w,
@@ -322,24 +324,28 @@ class Beam:
             # label=r"$\omega(z)$",
         )
 
-        a.set_ylabel("Radial distance (mm)")
-        a.set_xlabel("$z$-distance (mm)")
-        a.set_xlim([self.z_axis.min(), self.z_axis.max() * 1.025])
-        a.set_ylim(top=a.get_ylim()[1] * 1.1)
-        legend_without_duplicate_labels(a)
-        savename = ""
-        for optic in self.elements:
-            savename += f"{type(optic).__name__[0]}{
-                int(optic.f) if optic.f != np.inf else optic.f
-            }@{int(optic.pos)}_"
-        savename = savename.rstrip("_")
-        savename += ".png"
-        a.set_title(
+        ax.set_ylabel("Radial distance (mm)")
+        ax.set_xlabel("$z$-distance (mm)")
+        ax.set_xlim([self.z_axis.min(), self.z_axis.max() * 1.025])
+        ax.set_ylim(top=ax.get_ylim()[1] * 1.1)
+        legend_without_duplicate_labels(ax)
+        ax.set_title(
             rf"$\omega(z)$ and {encircled_energy:.1f}\%"
             f" encir. ({10 * np.log10(self._amp):.1f} dB loss)",
         )
-        f.savefig(P(savepath).joinpath(savename), dpi=600)
-        f.show()
+        if fig is None or ax is None:
+            savename = ""
+            for optic in self.elements:
+                savename += f"{type(optic).__name__[0]}{
+                    int(optic.f) if optic.f != np.inf else optic.f
+                }@{int(optic.pos)}_"
+            savename = savename.rstrip("_")
+            savename += ".png"
+            fig.savefig(Path(savepath).joinpath(savename), dpi=600)
+            fig.show()
+            return self
+
+        return fig, ax
 
 
 def main() -> None:

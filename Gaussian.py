@@ -4,15 +4,20 @@
 # import dash_bootstrap_components as dbc
 
 import ast
+import re
 import time
+from pathlib import Path
 
 import dash_bootstrap_components as dbc
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 from dash import Dash, ctx, dcc, html, no_update
 from dash.dependencies import ALL, Input, Output, State
 from dash_bootstrap_templates import load_figure_template
 from gaussian_beams import Aperture, Beam, Lens, Mirror
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.figure import Figure
 
 # adds templates to plotly.io
 load_figure_template(["DARKLY", "MINTY_DARK"])
@@ -79,7 +84,7 @@ elements = {"M": "Mirror", "L": "Lens", "A": "Aperture"}
 sim_elements = {"Mirror": Mirror, "Lens": Lens, "Aperture": Aperture}
 
 
-def parse_element(element: str, t: float) -> html.Div:
+def parse_element(element: str, t: float, z: float = -1, r: float = -1, f: float = -1) -> html.Div:
     match element:
         case "M" | "L":
             dis = False
@@ -89,6 +94,100 @@ def parse_element(element: str, t: float) -> html.Div:
             dis = True
             pla = "inf"
             val = np.inf
+
+    z_input = dbc.Col(
+        dbc.Input(
+            type="number",
+            placeholder="0 mm",
+            min=0,
+            # value=z,
+            id={"type": "pos", "index": t},
+            style={
+                "width": "5.5rem",
+                "margin-right": "10pt",
+            },
+        ),
+        width="auto",
+    )
+
+    f_input = dbc.Col(
+        dbc.Input(
+            type="number",
+            placeholder=pla,
+            disabled=dis,
+            min=0,
+            # value=val,
+            id={"type": "focal_length", "index": t},
+            style={
+                "width": "5.5rem",
+                "margin-right": "10pt",
+            },
+        ),
+        width="auto",
+    )
+
+    r_input = dbc.Col(
+        dbc.Input(
+            type="number",
+            placeholder="25.4 mm",
+            min=1e-6,
+            # value=25.4,
+            id={"type": "aperture_radius", "index": t},
+            style={
+                "width": "5.5rem",
+            },
+        ),
+        width="auto",
+    )
+
+    if z != -1:
+        z_input = dbc.Col(
+            dbc.Input(
+                type="number",
+                placeholder="0 mm",
+                min=0,
+                value=z,
+                id={"type": "pos", "index": t},
+                style={
+                    "width": "5.5rem",
+                    "margin-right": "10pt",
+                },
+            ),
+            width="auto",
+        )
+
+    if f != -1:
+        f_input = dbc.Col(
+            dbc.Input(
+                type="number",
+                placeholder=pla,
+                disabled=dis,
+                min=0,
+                value=f,
+                id={"type": "focal_length", "index": t},
+                style={
+                    "width": "5.5rem",
+                    "margin-right": "10pt",
+                },
+            ),
+            width="auto",
+        )
+
+    if r != -1:
+        r_input = dbc.Col(
+            dbc.Input(
+                type="number",
+                placeholder="25.4 mm",
+                min=1e-6,
+                value=r,
+                id={"type": "aperture_radius", "index": t},
+                style={
+                    "width": "5.5rem",
+                },
+            ),
+            width="auto",
+        )
+
     return dbc.Container(
         [
             # dbc.Row([f"{elements[element]}"]),
@@ -101,20 +200,7 @@ def parse_element(element: str, t: float) -> html.Div:
                         ),
                         width="auto",
                     ),
-                    dbc.Col(
-                        dbc.Input(
-                            type="number",
-                            placeholder="0 mm",
-                            min=0,
-                            # value=0,
-                            id={"type": "pos", "index": t},
-                            style={
-                                "width": "5.5rem",
-                                "margin-right": "10pt",
-                            },
-                        ),
-                        width="auto",
-                    ),
+                    z_input,
                     dbc.Col(
                         dcc.Markdown(
                             "f:",
@@ -122,38 +208,12 @@ def parse_element(element: str, t: float) -> html.Div:
                         ),
                         width="auto",
                     ),
-                    dbc.Col(
-                        dbc.Input(
-                            type="number",
-                            placeholder=pla,
-                            disabled=dis,
-                            min=0,
-                            # value=val,
-                            id={"type": "focal_length", "index": t},
-                            style={
-                                "width": "5.5rem",
-                                "margin-right": "10pt",
-                            },
-                        ),
-                        width="auto",
-                    ),
+                    f_input,
                     dbc.Col(
                         dcc.Markdown("r:", style=OPTIC_STYLE),
                         width="auto",
                     ),
-                    dbc.Col(
-                        dbc.Input(
-                            type="number",
-                            placeholder="25.4 mm",
-                            min=1e-6,
-                            # value=25.4,
-                            id={"type": "aperture_radius", "index": t},
-                            style={
-                                "width": "5.5rem",
-                            },
-                        ),
-                        width="auto",
-                    ),
+                    r_input,
                 ],
                 className="g-0",
                 justify="around",
@@ -175,6 +235,8 @@ def parse_element(element: str, t: float) -> html.Div:
     Output("persist_optics", "data"),
     Output("sim-plot", "figure"),
     Output("insertion-loss", "children"),
+    Output("download-data", "data"),
+    Output("download-figure", "data"),
     Input("elements-container", "children"),
     # Input("beam-setup", "children"),
     Input({"type": "pos", "index": ALL}, "value"),
@@ -185,6 +247,8 @@ def parse_element(element: str, t: float) -> html.Div:
     Input("pct_encirc", "value"),
     Input("insertion-loss", "children"),
     Input("total-z", "value"),
+    Input("download-data-button", "n_clicks"),
+    Input("download-figure-button", "n_clicks"),
     prevent_initial_call=True,
 )
 def set_persist_state(
@@ -198,17 +262,21 @@ def set_persist_state(
     encirc: float,
     insertion_loss_children: list,
     total_z: float,
+    _dl_data: int,
+    _dl_fig: int,
 ) -> list:  # stores the current state past browser refresh
     try:
         fig = make_figure()
         if len(children) > 0:
             z_tot = 0
             optics = []
+            name = ""
             for child in children:
                 z, f, r = -1, -1, -1
                 elem_type = child["props"]["children"][0]["props"]["children"][0]["props"][
                     "children"
                 ]["props"]["children"]
+                name += f"_{next(key for key in elements if elements[key] == elem_type)}_"
                 for e in child["props"]["children"][1]["props"]["children"][0]["props"][
                     "children"
                 ]:
@@ -227,6 +295,8 @@ def set_persist_state(
                     r = 25.4
                 if f == -1 or f is None:
                     f = np.inf
+
+                name += f"{f=:.2f},{r=:.2f}@{z=:.2f}"
 
                 z_tot += z
 
@@ -337,26 +407,154 @@ def set_persist_state(
                 ),
             )
 
+            data_ret = no_update
+            fig_ret = no_update
+            name = name.lstrip("_")
+            if total_z is not None:
+                name += f"_to_{total_z}"
+
+            match ctx.triggered[0]["prop_id"]:
+                case "download-data-button.n_clicks":
+                    kwargs = {"index": False}
+                    d = pd.DataFrame(np.array([beam.z_axis, beam.w]).transpose())
+                    data_ret = dcc.send_data_frame(
+                        d.to_csv,
+                        name + ".txt",
+                        **kwargs,
+                    )
+                case "download-figure-button.n_clicks":
+                    f = Figure(figsize=(7, 5))
+                    a = f.add_subplot(111)
+                    f, a = beam.plot(
+                        encircled_energy=encirc,
+                        savepath=name + ".png",
+                        fig=f,
+                        ax=a,
+                    )
+                    canvas = FigureCanvasAgg(f)
+                    canvas.print_figure(name + ".png", dpi=600)
+                    fig_ret = dcc.send_file(name + ".png")
+
             insertion_loss_children = [insertion_loss_children[0], f"{beam.loss:.2f} dB"]
 
-            return children, fig, insertion_loss_children
+            return (children, fig, insertion_loss_children, data_ret, fig_ret)
 
     # except TypeError:
     except ValueError:
-        return no_update, fig, no_update
+        return no_update, fig, no_update, no_update, no_update
 
     else:
-        return no_update, fig, no_update
+        return no_update, fig, no_update, no_update, no_update
+
+
+def create_elem(elem: str, **kwargs: dict) -> html.Div:
+    t = time.time()
+    return html.Div(
+        [
+            dbc.Row(
+                [
+                    # html.Div(
+                    #     [f"{elements[elem]}"], style={"width": "5%", "display": "inline-block"}
+                    # ),
+                    dbc.Col(
+                        html.H5(f"{elements[elem]}", style={"margin-top": "3pt"}),
+                        width="auto",
+                    ),
+                    dbc.Col(
+                        dbc.Row(
+                            [
+                                dbc.Col(
+                                    dbc.Button(
+                                        children=html.Span(
+                                            [
+                                                html.I(
+                                                    className="bi bi-trash3",
+                                                    style={
+                                                        "display": "inline-block",
+                                                    },
+                                                ),
+                                            ],
+                                        ),
+                                        title="Delete",
+                                        id={"type": "del-elem", "index": t},
+                                        color="danger",
+                                        outline=True,
+                                        className="sm",
+                                        size="sm",
+                                        # leftIcon=[DashIconify(icon="fluent:folder-mail-16-filled")],
+                                    ),
+                                    width="auto",
+                                ),
+                                dbc.Col(
+                                    [
+                                        dbc.Button(
+                                            children=html.Span(
+                                                [
+                                                    html.I(
+                                                        className="bi bi-arrow-up",
+                                                        style={
+                                                            "display": "inline-block",
+                                                        },
+                                                    ),
+                                                ],
+                                            ),
+                                            # "X",
+                                            title="Up",
+                                            id={"type": "raise-elem", "index": t},
+                                            color="secondary",
+                                            outline=True,
+                                            className="sm",
+                                            size="sm",
+                                            style={"margin-right": "3pt"},
+                                        ),
+                                        dbc.Button(
+                                            children=html.Span(
+                                                [
+                                                    html.I(
+                                                        className="bi bi-arrow-down",
+                                                        style={
+                                                            "display": "inline-block",
+                                                        },
+                                                    ),
+                                                ],
+                                            ),
+                                            # "X",
+                                            title="Down",
+                                            id={"type": "lower-elem", "index": t},
+                                            color="secondary",
+                                            outline=True,
+                                            className="sm",
+                                            size="sm",
+                                            style={"margin-right": "3pt"},
+                                        ),
+                                    ],
+                                    width="auto",
+                                ),
+                            ],
+                        ),
+                        width="auto",
+                    ),
+                ],
+                style={"margin-bottom": "3pt"},
+                justify="between",
+            ),
+            parse_element(elem, t, **kwargs),
+        ],
+        id=f"elem-{t}",
+    )
 
 
 @app.callback(
     Output("elements-container", "children"),
     Output("element-select", "value"),
+    Output("total-z", "value"),
+    Output("upload-fig", "filename"),
     Input("element-select", "value"),
     Input({"type": "del-elem", "index": ALL}, "n_clicks"),
     Input("delete-all", "n_clicks"),
     Input({"type": "raise-elem", "index": ALL}, "n_clicks"),
     Input({"type": "lower-elem", "index": ALL}, "n_clicks"),
+    Input("upload-fig", "filename"),
     State("persist_optics", "data"),
     State("elements-container", "children"),
     # prevent_initial_call=True, # initial call is useful to re-set optics if page refreshed
@@ -367,110 +565,42 @@ def handle_elements(
     __: int,
     ___: int,
     ____: int,
+    filename: str,
     persist: list,
     children: list,
 ) -> list:
+    t_z = no_update
+
     if ctx.triggered[0]["prop_id"] == ".":  # initial callback
         children = persist
 
     elif ctx.triggered_id == "element-select":
-        t = time.time()
-        new_element = html.Div(
-            [
-                dbc.Row(
-                    [
-                        # html.Div(
-                        #     [f"{elements[elem]}"], style={"width": "5%", "display": "inline-block"}
-                        # ),
-                        dbc.Col(
-                            html.H5(f"{elements[elem]}", style={"margin-top": "3pt"}),
-                            width="auto",
-                        ),
-                        dbc.Col(
-                            dbc.Row(
-                                [
-                                    dbc.Col(
-                                        dbc.Button(
-                                            children=html.Span(
-                                                [
-                                                    html.I(
-                                                        className="bi bi-trash3",
-                                                        style={
-                                                            "display": "inline-block",
-                                                        },
-                                                    ),
-                                                ],
-                                            ),
-                                            title="Delete",
-                                            id={"type": "del-elem", "index": t},
-                                            color="danger",
-                                            outline=True,
-                                            className="sm",
-                                            size="sm",
-                                            # leftIcon=[DashIconify(icon="fluent:folder-mail-16-filled")],
-                                        ),
-                                        width="auto",
-                                    ),
-                                    dbc.Col(
-                                        [
-                                            dbc.Button(
-                                                children=html.Span(
-                                                    [
-                                                        html.I(
-                                                            className="bi bi-arrow-up",
-                                                            style={
-                                                                "display": "inline-block",
-                                                            },
-                                                        ),
-                                                    ],
-                                                ),
-                                                # "X",
-                                                title="Up",
-                                                id={"type": "raise-elem", "index": t},
-                                                color="secondary",
-                                                outline=True,
-                                                className="sm",
-                                                size="sm",
-                                                style={"margin-right": "3pt"},
-                                            ),
-                                            dbc.Button(
-                                                children=html.Span(
-                                                    [
-                                                        html.I(
-                                                            className="bi bi-arrow-down",
-                                                            style={
-                                                                "display": "inline-block",
-                                                            },
-                                                        ),
-                                                    ],
-                                                ),
-                                                # "X",
-                                                title="Down",
-                                                id={"type": "lower-elem", "index": t},
-                                                color="secondary",
-                                                outline=True,
-                                                className="sm",
-                                                size="sm",
-                                                style={"margin-right": "3pt"},
-                                            ),
-                                        ],
-                                        width="auto",
-                                    ),
-                                ],
-                            ),
-                            width="auto",
-                        ),
-                    ],
-                    style={"margin-bottom": "3pt"},
-                    justify="between",
-                ),
-                parse_element(elem, t),
-            ],
-            id=f"elem-{t}",
-        )
-        children.append(new_element)
+        children.append(create_elem(elem))
         # return children, None
         # return None
+
+    elif ctx.triggered_id == "upload-fig":
+        children = []
+        matches = p.findall(Path(filename).stem)
+
+        for mat in matches:
+            element = mat[0]
+            for i, k in enumerate(mat[1:]):
+                v = float(k) if k != "np.inf" else k
+
+                if i == 0:
+                    f = v
+                elif i == 1:
+                    r = v
+                elif i == 2:  # noqa: PLR2004
+                    z = v
+
+            kwargs = {"z": z, "f": f, "r": r}
+            children.append(create_elem(element, **kwargs))
+
+        t_z_matches = p_t_z.findall(Path(filename).stem)
+
+        t_z = float(t_z_matches[0]) if t_z_matches else None
 
     elif "del-elem" in ctx.triggered[0]["prop_id"]:
         idx = next(
@@ -492,6 +622,7 @@ def handle_elements(
             == f"elem-{ast.literal_eval(ctx.triggered[0]['prop_id'].removesuffix('.n_clicks'))['index']}"
         )
         children.insert(idx - 1, children.pop(idx))
+
     elif "lower-elem" in ctx.triggered[0]["prop_id"]:
         idx = next(
             i
@@ -501,7 +632,7 @@ def handle_elements(
         )
         children.insert(idx + 1, children.pop(idx))
 
-    return children, None
+    return children, None, t_z, None
 
 
 sidebar = html.Div(
@@ -629,6 +760,12 @@ sidebar = html.Div(
 )
 
 
+REGEX = r"([M,L,A])_f=([\d]*[a-z]*[\.]?[\d]*[a-z]*),r=([\d]*[a-z]*[\.]?[\d]*[a-z]*)@z=([\d]*[a-z]*[\.]?[\d]*[a-z]*)"
+p = re.compile(REGEX)
+
+T_Z_REGEX = r"to_([\d]*)"
+p_t_z = re.compile(T_Z_REGEX)
+
 app.layout = dbc.Container(
     [
         dbc.Row(
@@ -707,11 +844,12 @@ app.layout = dbc.Container(
                                                         "display": "inline-block",
                                                     },
                                                 ),
+                                                dcc.Download(id="download-data"),
                                             ],
                                         ),
                                         # "Delete all",
                                         title="Download data",
-                                        id="download-dat",
+                                        id="download-data-button",
                                         # className="me-1",
                                         color="secondary",
                                         outline=True,
@@ -742,11 +880,12 @@ app.layout = dbc.Container(
                                                         "display": "inline-block",
                                                     },
                                                 ),
+                                                dcc.Download(id="download-figure"),
                                             ],
                                         ),
                                         # "Delete all",
                                         title="Download figure",
-                                        id="download-fig",
+                                        id="download-figure-button",
                                         # className="me-1",
                                         color="secondary",
                                         outline=True,
@@ -795,7 +934,7 @@ app.layout = dbc.Container(
                                         # "margin-top": "3pt",
                                         # "text-align": "center",
                                         # "width": "34rem",
-                                        "width": "89%",
+                                        # "width": "89%",
                                         "height": "50px",
                                         "lineHeight": "50px",
                                         "borderWidth": "1px",
@@ -804,7 +943,8 @@ app.layout = dbc.Container(
                                         "textAlign": "center",
                                         "margin-top": "10px",
                                         "margin-bottom": "10px",
-                                        "margin-left": "37px",
+                                        "margin-left": "55px",
+                                        "margin-right": "55px",
                                     },
                                 ),
                                 # width="auto",
@@ -819,6 +959,11 @@ app.layout = dbc.Container(
             className="g-0",
         ),
         dcc.Store(id="persist_optics", storage_type="local", data=[]),
+        dcc.Store(
+            id="beam-waist-data",
+            storage_type="local",
+        ),
+        dcc.Store(id="filename-stem", storage_type="local", data=""),
         # dbc.Input(id="input-box", persistence=True, persistence_type="local"),
         # dbc.Button("Clear Input", id="clear-button", className="mt-3"),
     ],
