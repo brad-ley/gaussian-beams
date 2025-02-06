@@ -4,10 +4,9 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import rc
 
-plt.style.use(["science"])
-rc("text.latex", preamble=r"\usepackage{cmbright}")
+# plt.style.use(["science"])
+# rc("text.latex", preamble=r"\usepackage{cmbright}")
 rcParams = [
     ["font.family", "sans-serif"],
     ["font.size", 14],
@@ -330,7 +329,8 @@ class Beam:
         ax.set_ylim(top=ax.get_ylim()[1] * 1.1)
         legend_without_duplicate_labels(ax)
         ax.set_title(
-            rf"$\omega(z)$ and {encircled_energy:.1f}\%"
+            # rf"$\omega(z)$ and {encircled_energy:.1f}\%"
+            rf"$\omega(z)$ and {encircled_energy:.1f}%"
             f" encir. ({10 * np.log10(self._amp):.1f} dB loss)",
         )
         if (fig is None or ax is None) and __name__ == "__main__":

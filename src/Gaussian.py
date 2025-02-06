@@ -24,7 +24,6 @@ load_figure_template(["DARKLY", "MINTY_DARK"])
 
 external_stylesheets = [
     dbc.icons.BOOTSTRAP,
-    dbc.themes.SLATE,
     dbc.themes.BOOTSTRAP,
 ]
 
@@ -48,6 +47,7 @@ def make_figure() -> go.Figure:
     m = 60
     return go.Figure().update_layout(
         # template=TEMPLATE,
+        template="plotly_dark",
         xaxis_title="z-distance (mm)",
         yaxis_title="Radius (mm)",
         margin={"l": 5 / 4 * m, "r": m / 2, "t": m / 2, "b": m},
@@ -959,6 +959,15 @@ app.layout = dbc.Container(
                             ),
                             justify="center",
                         ),
+                        dbc.Row(
+                            dbc.Col(
+                                dcc.Markdown("""
+                                             Code hosted at: [https://github.com/brad-ley/gaussian-beams](https://github.com/brad-ley/gaussian-beams)
+                                             """),
+                                width="auto",
+                            ),
+                            justify="center",
+                        ),
                     ],
                     width=8,
                     style=PLOT_STYLE,
@@ -988,3 +997,11 @@ app.layout = dbc.Container(
 
 if __name__ == "__main__":
     app.run_server(debug=True)
+
+    # app.run_server(
+    #     debug=False,
+    #     host="0.0.0.0",
+    #     dev_tools_ui=False,
+    #     dev_tools_props_check=False,
+    # )
+    # server = app.server

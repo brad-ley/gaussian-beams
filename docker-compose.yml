@@ -1,0 +1,6 @@
+services:
+  logger:
+    build: ./
+    container_name: gaussian-app
+    ports:
+      - "8050:8050"
