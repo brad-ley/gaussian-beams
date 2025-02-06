@@ -996,12 +996,12 @@ app.layout = dbc.Container(
 
 
 if __name__ == "__main__":
-    app.run_server(debug=True)
+    # app.run_server(debug=True)
 
-    # app.run_server(
-    #     debug=False,
-    #     host="0.0.0.0",
-    #     dev_tools_ui=False,
-    #     dev_tools_props_check=False,
-    # )
-    # server = app.server
+    app.run_server(
+        debug=False,
+        host="0.0.0.0",
+        dev_tools_ui=False,
+        dev_tools_props_check=False,
+    )
+    server = app.server
