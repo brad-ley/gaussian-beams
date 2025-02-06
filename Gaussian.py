@@ -6,6 +6,7 @@
 import ast
 import re
 import time
+from io import BytesIO
 from pathlib import Path
 
 import dash_bootstrap_components as dbc
@@ -16,7 +17,6 @@ from dash import Dash, ctx, dcc, html, no_update
 from dash.dependencies import ALL, Input, Output, State
 from dash_bootstrap_templates import load_figure_template
 from gaussian_beams import Aperture, Beam, Lens, Mirror
-from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 
 # adds templates to plotly.io
@@ -82,6 +82,13 @@ HEIGHT = 1
 
 elements = {"M": "Mirror", "L": "Lens", "A": "Aperture"}
 sim_elements = {"Mirror": Mirror, "Lens": Lens, "Aperture": Aperture}
+
+
+def fig_to_png(fig) -> BytesIO:
+    buf = BytesIO()
+    fig.savefig(buf, format="png", dpi=600)
+    buf.seek(0)
+    return buf
 
 
 def parse_element(element: str, t: float, z: float = -1, r: float = -1, f: float = -1) -> html.Div:
@@ -427,13 +434,14 @@ def set_persist_state(
                     a = f.add_subplot(111)
                     f, a = beam.plot(
                         encircled_energy=encirc,
-                        savepath=name + ".png",
+                        # savepath=name + ".png",
                         fig=f,
                         ax=a,
                     )
-                    canvas = FigureCanvasAgg(f)
-                    canvas.print_figure(name + ".png", dpi=600)
-                    fig_ret = dcc.send_file(name + ".png")
+                    # canvas = FigureCanvasAgg(f)
+                    # canvas.print_figure(name + ".png", dpi=600)
+                    png_image = fig_to_png(f)
+                    fig_ret = dcc.send_bytes(png_image.getvalue(), name + ".png")
 
             insertion_loss_children = [insertion_loss_children[0], f"{beam.loss:.2f} dB"]
 

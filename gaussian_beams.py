@@ -333,7 +333,7 @@ class Beam:
             rf"$\omega(z)$ and {encircled_energy:.1f}\%"
             f" encir. ({10 * np.log10(self._amp):.1f} dB loss)",
         )
-        if fig is None or ax is None:
+        if (fig is None or ax is None) and __name__ == "__main__":
             savename = ""
             for optic in self.elements:
                 savename += f"{type(optic).__name__[0]}{
