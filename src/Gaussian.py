@@ -62,8 +62,9 @@ SIDEBAR_STYLE = {
     "top": 0,
     "left": 50,
     "bottom": 0,
-    "width": "24rem",
+    "width": "26rem",
     "padding": "2rem 1rem",
+    "overflow": "scroll",
     # "background-color": "#f8f9fa",
 }
 
@@ -961,9 +962,11 @@ app.layout = dbc.Container(
                         ),
                         dbc.Row(
                             dbc.Col(
-                                dcc.Markdown("""
+                                dcc.Markdown(
+                                    """
                                              Code hosted at: [https://github.com/brad-ley/gaussian-beams](https://github.com/brad-ley/gaussian-beams)
-                                             """),
+                                             """,
+                                ),
                                 width="auto",
                             ),
                             justify="center",
